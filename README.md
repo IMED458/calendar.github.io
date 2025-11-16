@@ -4,7 +4,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>მორიგე ექიმების კალენდარი</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Firebase Compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=BPG+Nino+Mtavruli:wght@400;600&display=swap" rel="stylesheet">
@@ -18,6 +17,7 @@
       --text: #1e293b;
       --border: #cbd5e1;
       --danger: #ef4444;
+      --today-color: #dc2626;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -70,7 +70,13 @@
       transition: 0.2s;
     }
     .day-cell:hover { background: #eff6ff; border-color: var(--primary); }
-    .day-cell.today { background: #dbeafe; border-color: var(--primary); font-weight: 600; }
+    .day-cell.today {
+      background: #fee2e2 !important;
+      border-color: var(--today-color) !important;
+      color: var(--today-color) !important;
+      font-weight: 700;
+    }
+    .day-cell.today .date-num { color: var(--today-color); }
     .day-cell.has-shift { background: #ecfdf5; border-color: var(--accent); }
     .day-cell .date-num { font-weight: 600; margin-bottom: 3px; }
     .day-cell .shift-count { font-size: 10px; color: var(--accent); }
@@ -189,11 +195,12 @@
         <div id="departments-grid" class="departments-grid"></div>
         <button class="export-btn" id="export-excel">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/></svg>
-          Excel-ში ექსპორტი
+          Excel-ში ექსპორტი (თვე)
         </button>
       </div>
     </div>
   </div>
+
   <!-- Modal -->
   <div class="modal" id="shift-modal">
     <div class="modal-content">
@@ -201,9 +208,7 @@
       <div class="modal-body">
         <div class="form-group">
           <label>სპეციალობა</label>
-          <select id="specialty-filter">
-            <option value="">ყველა</option>
-          </select>
+          <select id="specialty-filter"><option value="">ყველა</option></select>
         </div>
         <div class="form-group">
           <label>ექიმის ძებნა</label>
@@ -256,8 +261,9 @@
       </div>
     </div>
   </div>
+
   <script>
-    // === Firebase კონფიგურაცია ===
+    // Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyAH2CvRxLYqd3KGAsRoTvzCTH4x8bZNnl0",
       authDomain: "doctor-calendar-db.firebaseapp.com",
@@ -265,20 +271,21 @@
       projectId: "doctor-calendar-db",
       storageBucket: "doctor-calendar-db.firebasestorage.app",
       messagingSenderId: "1085600886719",
-      appId: "1:1085600886719:web:7e22b240cbea045a443b0a",
-      measurementId: "G-VZ4R1HFJ1Z"
+      appId: "1:1085600886719:web:7e22b240cbea045a443b0a"
     };
-    // Firebase ინიციალიზაცია
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const shiftsRef = db.ref('shifts');
-    // === ექიმების სია ===
+
+    // === ექიმების სრული სია ===
     const doctors = [
       { name: 'პაატა ბარათაშვილი', specialty: 'რადიოლოგი', phone: '593 311 748' },
       { name: 'ვაჟა თავბერიძე', specialty: 'რადიოლოგი', phone: '551 470 471' },
       { name: 'მაია', specialty: 'რენტგენი', phone: '557 654 351' },
       { name: 'ნინო', specialty: 'რენტგენი', phone: '599 400 311' },
       { name: 'ნაზი', specialty: 'რენტგენი', phone: '555 181 801' },
+       { name: 'ნინო კიკვაძე', specialty: 'გადაუდებელი მედიცინა', phone: '598 739 756‬' },
+      { name: 'ანა დალაქიშვილი', specialty: 'გადაუდებელი მედიცინა', phone: '555 606 064‬‬' },
       { name: 'მარიამი', specialty: 'რენტგენი', phone: '598 100 644' },
       { name: 'ნიკა მაჩაიძე', specialty: 'CT ოპერატორი', phone: '598 295 798' },
       { name: 'მარიამი', specialty: 'CT ოპერატორი', phone: '599 216 624' },
@@ -416,11 +423,13 @@
       { name: 'ნინო გიორგაძე', specialty: 'კარდიოლოგია', phone: '577 970 910' },
       { name: 'თინათინ ნაფეტვარიძე', specialty: 'კარდიოლოგია', phone: '598 358 522' }
     ];
+
     let allShifts = [];
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
     let selectedDate = null;
     let selectedDoctor = null;
+
     const modal = document.getElementById('shift-modal');
     const openBtn = document.getElementById('open-modal-btn');
     const closeBtn = document.getElementById('close-modal');
@@ -441,11 +450,12 @@
     const exportBtn = document.getElementById('export-excel');
     const deptSearch = document.getElementById('dept-search');
     const statusEl = document.getElementById('status');
+
     function updateStatus(msg, color = '#f59e0b') {
       statusEl.textContent = msg;
       statusEl.style.background = color;
     }
-    // === Firebase-დან მონაცემების მიღება ===
+
     shiftsRef.on('value', (snapshot) => {
       const data = snapshot.val();
       allShifts = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
@@ -455,33 +465,25 @@
     }, (error) => {
       console.error(error);
       updateStatus('შეცდომა', '#ef4444');
-      allShifts = JSON.parse(localStorage.getItem('shifts') || '[]');
-      renderCalendar();
     });
-    // === მონაცემების შენახვა ===
+
     function saveShift(shift) {
       const newShiftRef = shiftsRef.push();
-      newShiftRef.set(shift).then(() => {
-        updateStatus('დამატებული', '#10b981');
-      }).catch(err => {
+      newShiftRef.set(shift).catch(err => {
+        console.error("Firebase error:", err);
         updateStatus('შეცდომა', '#ef4444');
-        const local = JSON.parse(localStorage.getItem('shifts') || '[]');
-        local.push({ ...shift, id: Date.now() });
-        localStorage.setItem('shifts', JSON.stringify(local));
       });
     }
+
     function deleteShift(id) {
-      shiftsRef.child(id).remove().catch(() => {
-        const local = JSON.parse(localStorage.getItem('shifts') || '[]');
-        localShifts = local.filter(s => s.id != id);
-        localStorage.setItem('shifts', JSON.stringify(localShifts));
-      });
+      shiftsRef.child(id).remove();
     }
-    // === დამატებითი ფუნქციები ===
+
     function formatDateDDMMYYYY(dateStr) {
       const [y, m, d] = dateStr.split('-');
-      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      return `${d}/${m}/${y}`;
     }
+
     function populateSpecialties() {
       const specs = [...new Set(doctors.map(d => d.specialty))].sort();
       specialtyFilter.innerHTML = '<option value="">ყველა</option>';
@@ -492,6 +494,7 @@
         specialtyFilter.appendChild(opt);
       });
     }
+
     function renderDoctorList() {
       const search = doctorSearch.value.toLowerCase().trim();
       const spec = specialtyFilter.value;
@@ -517,11 +520,13 @@
         doctorList.appendChild(item);
       });
     }
+
     function renderCalendar() {
       calendarGrid.innerHTML = '';
       const firstDay = new Date(currentYear, currentMonth, 1).getDay();
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const dayNames = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი'];
       dayNames.forEach(d => {
         const el = document.createElement('div');
@@ -537,9 +542,7 @@
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const cell = document.createElement('div');
         cell.className = 'day-cell';
-        if (day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()) {
-          cell.classList.add('today');
-        }
+        if (dateStr === todayStr) cell.classList.add('today');
         const shifts = allShifts.filter(s => s.date === dateStr);
         if (shifts.length > 0) {
           cell.classList.add('has-shift');
@@ -553,6 +556,7 @@
       const monthNames = ['იანვარი', 'თებერვალი', 'მარტი', 'აპრილი', 'მაისი', 'ივნისი', 'ივლისი', 'აგვისტო', 'სექტემბერი', 'ოქტომბერი', 'ნოემბერი', 'დეკემბერი'];
       monthYearEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
     }
+
     function selectDate(date) {
       selectedDate = date;
       selectedDateTitle.textContent = formatDateDDMMYYYY(date);
@@ -561,6 +565,7 @@
       deptSearch.value = '';
       filterDepartments();
     }
+
     function renderShiftsForDate(date) {
       const shifts = allShifts.filter(s => s.date === date);
       const byDept = {};
@@ -597,12 +602,11 @@
         btn.onclick = () => {
           if (confirm('დარწმუნებული ხართ?')) {
             deleteShift(btn.dataset.id);
-            renderShiftsForDate(date);
-            renderCalendar();
           }
         };
       });
     }
+
     function filterDepartments() {
       const search = deptSearch.value.toLowerCase().trim();
       document.querySelectorAll('.dept-card').forEach(card => {
@@ -610,7 +614,7 @@
         card.style.display = header.includes(search) ? 'block' : 'none';
       });
     }
-    // === მოდალი ===
+
     openBtn.onclick = () => {
       modal.classList.add('active');
       modalDate.value = selectedDate || new Date().toISOString().split('T')[0];
@@ -620,12 +624,14 @@
     };
     closeBtn.onclick = () => modal.classList.remove('active');
     window.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
+
     repeatType.addEventListener('change', () => {
       repeatUntil.style.display = repeatType.value === 'none' ? 'none' : 'block';
     });
     doctorSearch.addEventListener('input', renderDoctorList);
     specialtyFilter.addEventListener('change', renderDoctorList);
     deptSearch.addEventListener('input', filterDepartments);
+
     addFinalBtn.addEventListener('click', () => {
       if (!selectedDoctor || !modalDate.value || !modalHours.value) {
         alert('აირჩიეთ ექიმი, თარიღი და საათები');
@@ -667,6 +673,7 @@
       });
       modal.classList.remove('active');
     });
+
     document.getElementById('add-new-doctor').addEventListener('click', () => {
       const name = document.getElementById('new-name').value.trim();
       const spec = document.getElementById('new-specialty').value.trim();
@@ -681,6 +688,7 @@
         document.getElementById('new-phone').value = '';
       }
     });
+
     document.getElementById('prev-month').onclick = () => {
       currentMonth--;
       if (currentMonth < 0) { currentMonth = 11; currentYear--; }
@@ -697,29 +705,49 @@
       currentYear = n.getFullYear();
       renderCalendar();
     };
+
     exportBtn.onclick = () => {
       if (!selectedDate) return;
+      const [year, month] = selectedDate.split('-');
+      const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
       const wb = XLSX.utils.book_new();
-      const dataByDept = {};
-      allShifts.filter(s => s.date === selectedDate).forEach(s => {
-        if (!dataByDept[s.specialty]) dataByDept[s.specialty] = {};
-        if (!dataByDept[s.specialty][s.doctor]) {
-          dataByDept[s.specialty][s.doctor] = { phone: s.phone, hours: 0, count: 0 };
+      const monthPrefix = `${year}-${String(parseInt(month)).toString().padStart(2, '0')}`;
+      const shifts = allShifts.filter(s => s.date.startsWith(monthPrefix));
+      const byDept = {};
+
+      shifts.forEach(s => {
+        if (!byDept[s.specialty]) byDept[s.specialty] = {};
+        const day = parseInt(s.date.split('-')[2]);
+        const key = `${s.doctor}|${s.phone}`;
+        if (!byDept[s.specialty][key]) {
+          byDept[s.specialty][key] = {
+            doctor: s.doctor,
+            phone: s.phone,
+            hours: Array(daysInMonth + 1).fill(0),
+            totalHours: 0,
+            totalShifts: 0
+          };
         }
-        dataByDept[s.specialty][s.doctor].hours += parseInt(s.hours);
-        dataByDept[s.specialty][s.doctor].count += 1;
+        byDept[s.specialty][key].hours[day] += parseInt(s.hours);
+        byDept[s.specialty][key].totalHours += parseInt(s.hours);
+        byDept[s.specialty][key].totalShifts += 1;
       });
-      Object.keys(dataByDept).forEach(dept => {
-        const rows = [['ექიმი', 'ტელეფონი', 'საათები', 'რაოდენობა']];
-        Object.keys(dataByDept[dept]).forEach(doc => {
-          const d = dataByDept[dept][doc];
-          rows.push([doc, d.phone, d.hours, d.count]);
+
+      Object.keys(byDept).forEach(dept => {
+        const rows = [['ექიმი', 'ტელეფონი', ...Array.from({length: daysInMonth}, (_, i) => (i + 1).toString()), 'ჯამი საათები', 'ჯამი მორიგეობები']];
+        Object.values(byDept[dept]).forEach(info => {
+          const dayHours = info.hours.slice(1);
+          rows.push([info.doctor, info.phone, ...dayHours, info.totalHours, info.totalShifts]);
         });
         const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [{ wch: 22 }, { wch: 15 }, ...Array(daysInMonth).fill({ wch: 5 }), { wch: 13 }, { wch: 15 }];
         XLSX.utils.book_append_sheet(wb, ws, dept.substring(0, 30));
       });
-      XLSX.writeFile(wb, `მორიგეები_${formatDateDDMMYYYY(selectedDate)}.xlsx`);
+
+      const fileName = `მორიგეები_${year}_${month}.xlsx`;
+      XLSX.writeFile(wb, fileName);
     };
+
     // === ინიციალიზაცია ===
     populateSpecialties();
     renderDoctorList();
