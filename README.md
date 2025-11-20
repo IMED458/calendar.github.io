@@ -569,7 +569,7 @@
             const shiftsCount = allShifts.filter(s => s.date === dateStr).length;
             const cell = document.createElement('div');
             cell.className = 'day-cell' + (dateStr === today ? ' today' : '') + (shiftsCount > 0 ? ' has-shift' : '');
-            cell.innerHTML = `<div class="date-num">${day}</div>${shiftsCount > 0 ? `<div class="shift-count">${shiftsCount} მორიგე</div>` : ''}`;
+            cell.innerHTML = `<div class="date-num">${day}</div>${shiftsCount > 0 ? `<div class="shift-count">${shiftsCount} </div>` : ''}`;
             cell.onclick = () => openDateView(dateStr);
             calendarGrid.appendChild(cell);
             day++;
