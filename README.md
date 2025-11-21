@@ -65,6 +65,7 @@
     .btn-primary { background: var(--primary); color: white; }
     .btn-accent { background: var(--accent); color: white; }
     .btn-secondary { background: #6b7280; color: white; }
+    .repeat-section { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--gray); }
     .export-btn { background: #7c3aed; color: white; padding: 12px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 15px; margin-top: 20px; border: none; display: inline-flex; align-items: center; gap: 8px; }
     .status { position: fixed; top: 15px; left: 15px; background: #f59e0b; color: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   </style>
@@ -93,9 +94,7 @@
         <h3 style="margin: 15px 0; color: var(--primary-dark);" id="selected-date-title"></h3>
         <input type="text" id="dept-search" class="dept-search" placeholder="ძებნა განყოფილებაში..." />
         <div id="departments-grid" class="departments-grid"></div>
-        <button class="export-btn" id="export-excel">
-          Excel ექსპორტი (განყოფილებებით)
-        </button>
+        <button class="export-btn" id="export-excel">Excel ექსპორტი (განყოფილებებით)</button>
       </div>
     </div>
   </div>
@@ -123,11 +122,11 @@
           <label>გამეორება</label>
           <select id="repeat-type">
             <option value="none">არ განმეორდეს</option>
-            <option value="daily">ყოველ დღე</option>
+            <option value="daily">ყოველ სამუშაო დღეს (ორშ-პარ)</option>
             <option value="every2">ყოველ 2 დღეში</option>
             <option value="every4">ყოველ 4 დღეში</option>
           </select>
-          <input type="number" id="repeat-until" placeholder="დღეების რაოდენობა" style="margin-top:8px;display:none;" min="1"/>
+          <input type="number" id="repeat-until" placeholder="დღეების რაოდენობა (მაგ. 30)" style="margin-top:8px;display:none;" min="1"/>
         </div>
         <button class="btn btn-primary" id="add-shift-final">დამატება</button>
 
@@ -149,10 +148,18 @@
   </div>
 
   <script>
-    // Firebase
-    const firebaseConfig = { apiKey: "AIzaSyAH2CvRxLYqd3KGAsRoTvzCTH4x8bZNnl0", authDomain: "doctor-calendar-db.firebaseapp.com", databaseURL: "https://doctor-calendar-db-default-rtdb.firebaseio.com", projectId: "doctor-calendar-db", storageBucket: "doctor-calendar-db.firebasestorage.app", messagingSenderId: "1085600886719", appId: "1:1085600886719:web:7e22b240cbea045a443b0a" };
+    // Firebase + ანონიმური ავტორიზაცია
+    const firebaseConfig = {
+      apiKey: "AIzaSyAH2CvRxLYqd3KGAsRoTvzCTH4x8bZNnl0",
+      authDomain: "doctor-calendar-db.firebaseapp.com",
+      databaseURL: "https://doctor-calendar-db-default-rtdb.firebaseio.com",
+      projectId: "doctor-calendar-db",
+      storageBucket: "doctor-calendar-db.firebasestorage.app",
+      messagingSenderId: "1085600886719",
+      appId: "1:1085600886719:web:7e22b240cbea045a443b0a"
+    };
     firebase.initializeApp(firebaseConfig);
-    firebase.auth().signInAnonymously();
+    firebase.auth().signInAnonymously().catch(err => console.error("Auth error:", err));
     const db = firebase.database();
     const shiftsRef = db.ref('shifts');
     const doctorsRef = db.ref('doctors');
@@ -228,12 +235,13 @@
       {name:"ზურაბ გოგიჩაშვილი",specialty:"ანგიოქირურგია",phone:"599 55 80 60"},{name:"დათო ბაბილოძე",specialty:"ანგიოქირურგია",phone:"599 520 938"},
       {name:"ნატალია ჯინჯოლია",specialty:"კარდიოლოგია",phone:"599 158 738"},{name:"ნანა ჩადუნელი",specialty:"კარდიოლოგია",phone:"593 145 444"},
       {name:"სოფიო ნაჭყებია",specialty:"კარდიოლოგია",phone:"574 730 555"},{name:"ზურაბ ოკუჯავა",specialty:"კარდიოლოგია",phone:"599 584 646"},
-      {name:"ნათია ჩიქოვანი",specialty:"კარდიოლოგია",phone:"598 280 843"},{name:"ნინო ჩხაიძე",specialty:"კარდიოლოგია",phone:"599 073 15"},
+      {name:"ნათია ჩიქოვანი",specialty:"კარდიოლოგია",phone:"598 280 843"},{name:"ნინო ჩხაიძე",specialty:"კარდიოლოგია",phone:"599 073 195"},
       {name:"ბაქარ ცნობილაძე",specialty:"კარდიოლოგია",phone:"568 817 537"},{name:"ნინო გიორგაძე",specialty:"კარდიოლოგია",phone:"577 970 910"},
       {name:"თინათინ ნაფეტვარიძე",specialty:"კარდიოლოგია",phone:"598 358 522"}
     ];
     doctors = [...defaultDoctors];
 
+    // Firebase-დან დამატებითი ექიმები
     doctorsRef.on('value', s => { if(s.val()){ Object.entries(s.val()).forEach(([k,v]) => { if(!doctors.find(d=>d.name===v.name && d.phone===v.phone)) doctors.push({...v,id:k}); }); populateSpecialties(); renderDoctorList(); } });
     shiftsRef.on('value', s => { allShifts = s.val() ? Object.entries(s.val()).map(([k,v])=>({id:k,...v})) : []; renderCalendar(); if(selectedDate) renderShiftsForDate(selectedDate); updateStatus('მზადაა!', '#10b981'); });
 
@@ -260,11 +268,11 @@
       const today=new Date().toISOString().split('T')[0];
       while(calendarGrid.children.length>7) calendarGrid.removeChild(calendarGrid.lastChild);
       for(let i=0,day=1; i<6*7; i++){
-        if(i< firstDay-1 || day>daysInMonth){ if(day>daysInMonth) break; const empty=document.createElement('div'); empty.className='day-cell'; calendarGrid.appendChild(empty); continue; }
+        if(i<firstDay-1 || day>daysInMonth){ if(day>daysInMonth) break; const empty=document.createElement('div'); empty.className='day-cell'; calendarGrid.appendChild(empty); continue; }
         const dateStr=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const count=allShifts.filter(s=>s.date===dateStr).length;
         const cell=document.createElement('div'); cell.className='day-cell'+(dateStr===today?' today':'')+(count>0?' has-shift':'');
-        cell.innerHTML=`<div class="date-num">${day}</div>${count>0?`<div class="shift-count">${count} </div>`:''}`;
+        cell.innerHTML=`<div class="date-num">${day}</div>${count>0?`<div class="shift-count">${count}</div>`:''}`;
         cell.onclick=()=>openDateView(dateStr);
         calendarGrid.appendChild(cell); day++;
       }
@@ -272,26 +280,26 @@
     }
 
     function openDateView(d){ selectedDate=d; modalDate.value=d; selectedDateTitle.textContent=`მორიგეები - ${formatDateDDMMYYYY(d)}`; selectedDateView.style.display='block'; renderShiftsForDate(d); }
-    
+
     function renderShiftsForDate(d){
       const shifts=allShifts.filter(s=>s.date===d);
       const byDept={}; shifts.forEach(s=>{ if(!byDept[s.specialty]) byDept[s.specialty]=[]; byDept[s.specialty].push(s); });
       const search=deptSearch.value.toLowerCase(); departmentsGrid.innerHTML='';
       Object.keys(byDept).filter(x=>x.toLowerCase().includes(search)).sort().forEach(dept=>{
         const card=document.createElement('div'); card.className='dept-card'; card.innerHTML=`<div class="dept-header">${dept}</div>`;
-        byDept[dept].forEach(s=>{ 
+        byDept[dept].forEach(s=>{
           const item=document.createElement('div'); item.className='shift-item';
           item.innerHTML=`<div class="shift-info"><strong>${s.name}</strong><br><small>${s.phone}</small></div><div style="display:flex;gap:8px;align-items:center;"><span class="shift-hours">${s.hours} სთ</span><button class="delete-btn" data-id="${s.id}">X</button></div>`;
           card.appendChild(item);
         });
         departmentsGrid.appendChild(card);
       });
-      
+
       // წაშლის დადასტურება
       document.querySelectorAll('.delete-btn').forEach(btn=>{
         btn.onclick=function(e){
           e.stopPropagation();
-          if(confirm(`დარწმუნებული ხართ, რომ გინდათ ${this.parentElement.parentElement.querySelector('strong').textContent}-ის მორიგეობის წაშლა?`)){
+          if(confirm(`დარწმუნებული ხართ, რომ გინდათ წაშალოთ ${this.parentElement.parentElement.querySelector('strong').textContent}-ის მორიგეობა?`)){
             shiftsRef.child(this.dataset.id).remove();
           }
         };
@@ -347,27 +355,43 @@
       alert('Excel წარმატებით გადმოწერილია!');
     };
 
-    // მოდალი და ღილაკები
-    openBtn.onclick=()=>{ modal.classList.add('active'); selectedDoctor=null; modalPhone.value=''; renderDoctorList(); };
-    closeBtn.onclick=()=>{ modal.classList.remove('active'); };
-    document.getElementById('prev-month').onclick=()=>{ currentMonth=(currentMonth-1+12)%12; if(currentMonth===11) currentYear--; renderCalendar(); };
-    document.getElementById('next-month').onclick=()=>{ currentMonth=(currentMonth+1)%12; if(currentMonth===0) currentYear++; renderCalendar(); };
-    document.getElementById('today-btn').onclick=()=>{ const t=new Date(); currentMonth=t.getMonth(); currentYear=t.getFullYear(); renderCalendar(); };
-    doctorSearch.oninput=renderDoctorList; specialtyFilter.onchange=renderDoctorList; deptSearch.oninput=()=>{ if(selectedDate) renderShiftsForDate(selectedDate); };
-    repeatType.onchange=()=>{ repeatUntil.style.display=repeatType.value!=='none'?'block':'none'; };
-
+    // გამეორება — მხოლოდ სამუშაო დღეებში
     addFinalBtn.onclick=()=>{
       if(!selectedDoctor) return alert('აირჩიეთ ექიმი');
       if(!modalDate.value||!modalHours.value) return alert('შეავსეთ ყველა ველი');
-      const base={name:selectedDoctor.name,specialty:selectedDoctor.specialty,phone:selectedDoctor.phone,date:modalDate.value,hours:modalHours.value};
-      const step = repeatType.value==='every2'?2 : repeatType.value==='every4'?4 : 1;
-      const days = repeatType.value==='none'?1 : (parseInt(repeatUntil.value)||30);
+
+      const base={name:selectedDoctor.name,specialty:selectedDoctor.specialty,phone:selectedDoctor.phone,hours:modalHours.value};
+      const days=parseInt(repeatUntil.value)||30;
       let added=0;
-      for(let i=0;i<days;i+=step){
-        const d=new Date(modalDate.value); d.setDate(d.getDate()+i);
-        const dateStr=d.toISOString().split('T')[0];
-        shiftsRef.push({...base,date:dateStr}); added++;
+      let current = new Date(modalDate.value);
+
+      if(repeatType.value==='none'){
+        shiftsRef.push({...base,date:modalDate.value}); added++;
+      } else if(repeatType.value==='daily'){
+        for(let i=0; i<days; i++){
+          const dayOfWeek = current.getDay();
+          if(dayOfWeek >=1 && dayOfWeek <=5){ // ორშაბათი-პარასკევი
+            const dateStr=current.toISOString().split('T')[0];
+            shiftsRef.push({...base,date:dateStr}); added++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      } else if(repeatType.value==='every2'){
+        for(let i=0; i<days; i+=2){
+          current = new Date(modalDate.value);
+          current.setDate(current.getDate() + i);
+          const dateStr=current.toISOString().split('T')[0];
+          shiftsRef.push({...base,date:dateStr}); added++;
+        }
+      } else if(repeatType.value==='every4'){
+        for(let i=0; i<days; i+=4){
+          current = new Date(modalDate.value);
+          current.setDate(current.getDate() + i);
+          const dateStr=current.toISOString().split('T')[0];
+          shiftsRef.push({...base,date:dateStr}); added++;
+        }
       }
+
       modal.classList.remove('active');
       alert(`დაემატა ${added} მორიგეობა!`);
     };
@@ -379,6 +403,14 @@
       document.getElementById('new-name').value=document.getElementById('new-phone').value=''; document.getElementById('new-specialty-select').value='';
       alert('ექიმი დაემატა!');
     };
+
+    openBtn.onclick=()=>{ modal.classList.add('active'); selectedDoctor=null; modalPhone.value=''; renderDoctorList(); };
+    closeBtn.onclick=()=>{ modal.classList.remove('active'); };
+    document.getElementById('prev-month').onclick=()=>{ currentMonth=(currentMonth-1+12)%12; if(currentMonth===11) currentYear--; renderCalendar(); };
+    document.getElementById('next-month').onclick=()=>{ currentMonth=(currentMonth+1)%12; if(currentMonth===0) currentYear++; renderCalendar(); };
+    document.getElementById('today-btn').onclick=()=>{ const t=new Date(); currentMonth=t.getMonth(); currentYear=t.getFullYear(); renderCalendar(); };
+    doctorSearch.oninput=renderDoctorList; specialtyFilter.onchange=renderDoctorList; deptSearch.oninput=()=>{ if(selectedDate) renderShiftsForDate(selectedDate); };
+    repeatType.onchange=()=>{ repeatUntil.style.display=repeatType.value!=='none'?'block':'none'; };
 
     renderCalendar();
   </script>
